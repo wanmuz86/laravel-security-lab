@@ -36,4 +36,7 @@ services:
       - ./reports:/var/www/html/reports
       - ./.github:/var/www/html/.github
       - ./config/services.php:/var/www/html/config/services.php
+      # Lab 9: static analysis configuration and baseline
+      - ./phpstan.neon:/var/www/html/phpstan.neon
+      - ./phpstan-baseline.neon:/var/www/html/phpstan-baseline.neon
     # Bound to localhost only: this application is intentionally vulnerable.

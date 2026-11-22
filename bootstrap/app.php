@@ -22,9 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [
-            SecurityHeaders::class,
-        ]);
+        // Lab 9: register globally (not in the "web" group, and not appended) so the headers are also added to
+        // responses that never reach the end of the web group: the 419 page from the CSRF check and 404s for
+        // unmatched URLs. ZAP flagged both as missing a CSP.
+        $middleware->prepend(SecurityHeaders::class);
 
         $middleware->alias([
             'org.admin' => EnsureOrgAdmin::class,
