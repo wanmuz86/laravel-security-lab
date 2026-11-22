@@ -39,7 +39,14 @@ jobs:
       - name: Build and start the application
         run: |
           docker compose up -d --build
-          curl --fail --silent --retry 40 --retry-delay 3 --retry-connrefused http://localhost:8000/up
+          # The container runs composer install, migrations and seeding before the server listens,
+          # so wait (up to ~3 minutes) and print the container log if it never comes up.
+          for i in $(seq 1 60); do
+            curl --fail --silent http://localhost:8000/up && exit 0
+            sleep 3
+          done
+          docker compose logs app
+          exit 1
 
       - name: Execute Application Tests
         run: docker compose exec -T app php artisan test

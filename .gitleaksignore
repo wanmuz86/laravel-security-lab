@@ -1,0 +1,14 @@
+# Gitleaks fingerprints accepted for this training repository (one per line: commit:file:rule:line).
+# Every entry needs a justification; an ignore list is a documented risk decision, not a way to hide findings.
+
+# LEAK-01: fictional payment gateway key committed in 5f414a4 and removed in 19a865a.
+# Rotated (it was never a real credential). History is kept: rewriting shared branches would break every
+# clone, so the purge is demonstrated on a throwaway clone with git-filter-repo instead (see LAB8.md).
+5f414a440cdd5695921f8bcaa465618bcbb1ec95:config/services.php:generic-api-key:39
+
+# LEAK-02: shared secret for the local training webhook (Lab 6). It only signs requests between the
+# training containers on localhost and is regenerated per class. Accepted for the lab environment; never reuse it.
+6459690cf4aef3ccffb984a108899e6e2a3214dc:docker/env.lab:generic-api-key:27
+
+# LEAK-02 as found in the working tree by `gitleaks dir` (the fingerprint has no commit).
+docker/env.lab:generic-api-key:25
