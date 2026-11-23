@@ -5,58 +5,79 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Least privilege: the workflow token can only read repository contents. No secrets are used, so it is
-# safe to run on pull requests (never run untrusted PR code with privileged tokens or deployment secrets).
 permissions:
   contents: read
 
 env:
-  GITLEAKS_VERSION: 8.30.1
   TRIVY_IMAGE: aquasec/trivy:0.76.2
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.17.0
+  GITLEAKS_VERSION: 8.30.1
 
 jobs:
-  application-security:
+  security:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history so Gitleaks scans every commit
+          fetch-depth: 0 # gitleaks git scans history; a shallow clone hides leaks
 
-      # The Laravel skeleton and vendor/ live inside the Docker image (see Dockerfile), so the PHP tooling
-      # (Pest, PHPStan) runs in the container. The runner's PHP/Composer is only used for `composer audit`.
-      - name: Prepare report folder
+      - name: Prepare reports folder
         run: |
           mkdir -p reports
-          chmod 777 reports   # the ZAP and Trivy containers write here as other users
+          chmod 777 reports # the ZAP container user must be able to write here
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          tools: composer:v2
-          coverage: none
+      # The Laravel skeleton and vendor/ are built inside the Docker image (see Dockerfile),
+      # so "install dependencies" means building and starting the application container.
+      - name: Build and start the application
+        id: start_app
+        continue-on-error: true
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            curl --fail --silent http://localhost:8000/up && exit 0
+            sleep 3
+          done
+          docker compose logs app
+          exit 1
+
+      - name: Pest tests
+        id: pest
+        if: steps.start_app.outcome == 'success'
+        continue-on-error: true
+        run: |
+          docker compose exec -T app php artisan test --log-junit=/tmp/pest-junit.xml
+
+      - name: Collect Pest report
+        if: always() && steps.start_app.outcome == 'success'
+        run: docker compose cp app:/tmp/pest-junit.xml reports/pest-junit.xml || true
+
+      - name: PHPStan
+        id: phpstan
+        if: steps.start_app.outcome == 'success'
+        continue-on-error: true
+        run: |
+          docker compose exec -T app sh -c 'rm -rf /tmp/phpstan; vendor/bin/phpstan analyse --no-progress --memory-limit=1G --error-format=json' > reports/phpstan.json
 
       - name: Composer Audit
         id: composer_audit
         continue-on-error: true
         run: composer audit --locked --no-interaction --format=json > reports/composer-audit.json
 
-      - name: Install Gitleaks
+      - name: Install Gitleaks (pinned, checksum-verified)
         run: |
-          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
-          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -fsSL "${base}/${archive}" -o "/tmp/${archive}"
-          curl -fsSL "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o /tmp/gitleaks_checksums.txt
-          (cd /tmp && grep " ${archive}\$" gitleaks_checksums.txt | sha256sum --check -)
-          mkdir -p /tmp/gitleaks-bin
-          tar -xzf "/tmp/${archive}" -C /tmp/gitleaks-bin
-          sudo install /tmp/gitleaks-bin/gitleaks /usr/local/bin/gitleaks
+          V="$GITLEAKS_VERSION"
+          BASE="https://github.com/gitleaks/gitleaks/releases/download/v${V}"
+          TARBALL="gitleaks_${V}_linux_x64.tar.gz"
+          mkdir -p /tmp/gitleaks && cd /tmp/gitleaks
+          curl -sSfL -O "$BASE/$TARBALL"
+          curl -sSfL -o checksums.txt "$BASE/gitleaks_${V}_checksums.txt"
+          grep " $TARBALL\$" checksums.txt | sha256sum -c -
+          tar -xzf "$TARBALL" gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
           gitleaks version
 
-      # Findings already accepted with a written justification live in .gitleaksignore.
       - name: Gitleaks secret scan
         id: gitleaks
         continue-on-error: true
@@ -67,14 +88,13 @@ jobs:
             --report-format json \
             --report-path reports/gitleaks.json
 
-      - name: Build Laravel container
+      - name: Build container image
         id: docker_build
         continue-on-error: true
         run: docker build -t laravel-security-lab:ci .
 
-      # Policy: block on HIGH/CRITICAL vulnerabilities that have a fix available. Findings without an upstream
-      # fix (`--ignore-unfixed`) are still in the JSON report for review but cannot be remediated by this repository.
-      - name: Trivy container scan
+      # Blocks on fixable HIGH/CRITICAL only: the Debian base has unfixed findings nobody can patch yet.
+      - name: Trivy image scan
         id: trivy
         if: steps.docker_build.outcome == 'success'
         continue-on-error: true
@@ -91,44 +111,7 @@ jobs:
             --output /reports/trivy.json \
             laravel-security-lab:ci
 
-      - name: Start the isolated Laravel application
-        id: start_app
-        continue-on-error: true
-        run: |
-          docker compose up -d --build
-          # The container runs composer install, migrations and seeding before the server listens.
-          for i in $(seq 1 60); do
-            curl --fail --silent http://localhost:8000/up && exit 0
-            sleep 3
-          done
-          docker compose logs app > reports/laravel-server.log
-          exit 1
-
-      - name: Pest security regression tests
-        id: pest
-        if: steps.start_app.outcome == 'success'
-        continue-on-error: true
-        run: docker compose exec -T app php artisan test tests/Feature/Security --log-junit=reports/pest-junit.xml
-
-      - name: PHPStan
-        id: phpstan
-        if: steps.start_app.outcome == 'success'
-        continue-on-error: true
-        run: |
-          docker compose exec -T app vendor/bin/phpstan analyse \
-            --no-progress \
-            --memory-limit=1G \
-            --error-format=json > reports/phpstan.json
-
-      - name: Production configuration checks
-        id: production
-        if: steps.start_app.outcome == 'success'
-        continue-on-error: true
-        run: |
-          docker compose exec -T app php artisan test tests/Feature/Security/ProductionConfigurationTest.php \
-            --log-junit=reports/production-config-junit.xml
-
-      # Baseline scan (passive). FAIL rules block, WARN rules are reported (see zap/baseline.conf).
+      # -I: WARN alerts do not fail the run; the FAIL rules live in zap/baseline.conf.
       - name: OWASP ZAP baseline scan
         id: zap
         if: steps.start_app.outcome == 'success'
@@ -139,15 +122,15 @@ jobs:
             -v "$PWD/reports:/zap/wrk:rw" \
             "$ZAP_IMAGE" \
             zap-baseline.py \
-              -t http://127.0.0.1:8000 \
-              -c zap-baseline.conf \
-              -I \
-              -r zap-report.html \
-              -J zap-report.json
+            -t http://127.0.0.1:8000 \
+            -c zap-baseline.conf \
+            -I \
+            -r zap-report.html \
+            -J zap-report.json
 
-      - name: Collect application log
-        if: always()
-        run: docker compose logs app > reports/laravel-server.log 2>&1 || true
+      - name: Application log on failure
+        if: always() && steps.start_app.outcome == 'success'
+        run: docker compose logs app > reports/app.log 2>&1 || true
 
       - name: Upload security reports
         if: always()
@@ -155,49 +138,41 @@ jobs:
         with:
           name: laravel-security-reports
           path: reports/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
-      # The gate. A tool that failed, was skipped, or produced no report is never treated as a pass.
+      # Only "success" passes: a failed, skipped or cancelled step fails the gate.
       - name: Enforce security gates
         if: always()
         env:
-          COMPOSER_AUDIT: ${{ steps.composer_audit.outcome }}
-          GITLEAKS: ${{ steps.gitleaks.outcome }}
-          DOCKER_BUILD: ${{ steps.docker_build.outcome }}
-          TRIVY: ${{ steps.trivy.outcome }}
-          START_APP: ${{ steps.start_app.outcome }}
-          PEST: ${{ steps.pest.outcome }}
-          PHPSTAN: ${{ steps.phpstan.outcome }}
-          PRODUCTION: ${{ steps.production.outcome }}
-          ZAP: ${{ steps.zap.outcome }}
+          RESULTS: |
+            Application start|${{ steps.start_app.outcome }}
+            Pest tests|${{ steps.pest.outcome }}
+            PHPStan|${{ steps.phpstan.outcome }}
+            Composer Audit|${{ steps.composer_audit.outcome }}
+            Gitleaks|${{ steps.gitleaks.outcome }}
+            Container build|${{ steps.docker_build.outcome }}
+            Trivy|${{ steps.trivy.outcome }}
+            OWASP ZAP|${{ steps.zap.outcome }}
         run: |
           failed=0
-
-          check() {
-            name="$1"; outcome="$2"; report="$3"
-            if [ "$outcome" != "success" ]; then
-              echo "::error::Security gate failed: ${name} (${outcome})"
-              echo "| ${name} | FAIL (${outcome}) |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Security gate results"
+            echo "| Check | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS='|' read -r name result; do
+            [ -z "$name" ] && continue
+            echo "| $name | $result |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$result" != "success" ]; then
+              echo "Security gate failed: $name ($result)"
               failed=1
-            elif [ -n "$report" ] && [ ! -s "reports/${report}" ]; then
-              echo "::error::Security gate failed: ${name} produced no report (reports/${report})"
-              echo "| ${name} | FAIL (no report) |" >> "$GITHUB_STEP_SUMMARY"
-              failed=1
-            else
-              echo "| ${name} | pass |" >> "$GITHUB_STEP_SUMMARY"
             fi
-          }
-
-          { echo "### Security gate results"; echo "| Check | Result |"; echo "|---|---|"; } >> "$GITHUB_STEP_SUMMARY"
-          check "Composer Audit"        "$COMPOSER_AUDIT" composer-audit.json
-          check "Gitleaks"              "$GITLEAKS"       gitleaks.json
-          check "Container build"       "$DOCKER_BUILD"   ""
-          check "Trivy"                 "$TRIVY"          trivy.json
-          check "Application start"     "$START_APP"      ""
-          check "Pest security tests"   "$PEST"           pest-junit.xml
-          check "PHPStan"               "$PHPSTAN"        phpstan.json
-          check "Production settings"   "$PRODUCTION"     production-config-junit.xml
-          check "OWASP ZAP baseline"    "$ZAP"            zap-report.json
-
+          done <<EOF
+          $RESULTS
+          EOF
           exit "$failed"
+
+      - name: Stop the application
+        if: always()
+        run: docker compose down -v

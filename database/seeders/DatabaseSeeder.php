@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Document;
 use App\Models\Order;
 use App\Models\ProjectDocument;
 use App\Models\Organization;
@@ -63,6 +64,7 @@ class DatabaseSeeder extends Seeder
             $this->createDocument($project, $created[$creatorEmail], $org->name);
         }
         $this->seedOrders($alpha, $beta, $password);
+        $this->seedCustomerDocuments();
 
         Project::where('name', 'Alpha Website Redesign')->firstOrFail()->comments()->create([
             'user_id' => $created['staff.alpha@example.test']->id,
@@ -108,6 +110,43 @@ class DatabaseSeeder extends Seeder
                 'token' => hash('sha256', $plain),
                 'abilities' => ['*'],
                 'expires_at' => now()->addDays(30),
+            ]);
+        }
+    }
+
+    /**
+     * Lab 10: Customer Document Management API data. Document IDs are fixed so instructions can reference them:
+     *   1 Alice (Alpha)   2 Bob (Beta, carries BOB-PRIVATE-DOC-MARKER)   3 Alice   4 Bob
+     * Files are written to the private "secure_documents" disk; forceCreate() keeps the seeder independent of $fillable.
+     */
+    private function seedCustomerDocuments(): void
+    {
+        $alice = User::where('email', 'alice@example.test')->firstOrFail();
+        $bob = User::where('email', 'bob@example.test')->firstOrFail();
+
+        $documents = [
+            [$alice, 'Alice service agreement', 'alice-service-agreement.txt', 'Alice service agreement. Customer-visible contents.', 'Internal: standard terms, no legal review needed.', true],
+            [$bob, 'Bob invoice archive', 'bob-invoice-archive.txt', "Bob invoice archive.\nBOB-PRIVATE-DOC-MARKER: confidential customer document.", 'BOB-INTERNAL-NOTE: flagged for fraud review.', false],
+            [$alice, 'Alice onboarding form', 'alice-onboarding-form.txt', 'Alice onboarding form.', 'Internal: KYC pending.', false],
+            [$bob, 'Bob contract draft', 'bob-contract-draft.txt', 'Bob contract draft.', 'Internal: awaiting approval.', false],
+        ];
+
+        foreach ($documents as [$owner, $title, $name, $contents, $notes, $approved]) {
+            $path = 'documents/'.hash('sha256', $name);
+            Storage::disk('secure_documents')->put($path, $contents);
+
+            Document::forceCreate([
+                'user_id' => $owner->id,
+                'organization_id' => $owner->organization_id,
+                'title' => $title,
+                'original_name' => $name,
+                'storage_path' => $path,
+                'mime_type' => 'text/plain',
+                'size' => strlen($contents),
+                'sha256' => hash('sha256', $contents),
+                'status' => 'clean',
+                'internal_notes' => $notes,
+                'is_approved' => $approved,
             ]);
         }
     }

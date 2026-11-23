@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderProcessingController;
@@ -55,4 +56,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/orders/{order}/process', [OrderProcessingController::class, 'store'])
         ->middleware('throttle:orders-process');
+});
+
+// Lab 10: Customer Document Management API (Sanctum-authenticated).
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/documents', [DocumentController::class, 'index']);
+
+    Route::get('/documents/{document}', [DocumentController::class, 'show']);
+
+    Route::get('/documents/{document}/summary', [DocumentController::class, 'summary'])
+        ->middleware('can:view,document');
+
+    Route::patch('/documents/{document}', [DocumentController::class, 'update']);
+
+    Route::get('/documents/{document}/download', [DocumentController::class, 'download']);
 });
