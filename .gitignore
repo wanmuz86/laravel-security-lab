@@ -17,6 +17,5 @@
 /package.json
 /vite.config.js
 /.editorconfig
-/.gitattributes
 /.env.example
 /.phpunit.cache
