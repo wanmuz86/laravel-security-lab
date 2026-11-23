@@ -1,7 +1,8 @@
 FROM php:8.3-cli
 
 # System packages + PHP extensions needed by Laravel (SQLite keeps the lab to a single container)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade pulls in Debian security fixes published after the base image was built (Trivy gate).
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         git unzip libzip-dev libsqlite3-dev libonig-dev libpng-dev libjpeg-dev \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install pdo_sqlite zip mbstring gd \
