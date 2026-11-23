@@ -32,7 +32,9 @@ rm -f database/migrations/0001_01_01_000000_create_users_table.php \
 # Local .env from the lab template (DB path made relative to this checkout)
 KEY=""
 [ -f .env ] && KEY=$(grep '^APP_KEY=' .env | cut -d= -f2- || true)
-sed "s|^DB_DATABASE=.*|DB_DATABASE=$(pwd)/database/database.sqlite|" docker/env.lab > .env
+# `pwd -W` gives a Windows-style path under Git Bash (PHP can't read /c/...); plain `pwd` elsewhere
+ROOT="$(pwd -W 2>/dev/null || pwd)"
+sed "s|^DB_DATABASE=.*|DB_DATABASE=$ROOT/database/database.sqlite|" docker/env.lab > .env
 [ -n "$KEY" ] && sed -i.bak "s|^APP_KEY=.*|APP_KEY=$KEY|" .env && rm -f .env.bak
 [ -n "$KEY" ] || php artisan key:generate --force
 
