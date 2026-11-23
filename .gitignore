@@ -1,0 +1,14 @@
+/vendor
+/node_modules
+/storage/*.key
+/storage/logs/*.log
+/database/database.sqlite
+
+# Environment files hold secrets: never commit them. Only the sanitized template is tracked.
+.env
+.env.*
+!.env.example
+
+# Lab 9: scan output is uploaded as a CI artifact, not committed
+reports/*
+!reports/.gitkeep

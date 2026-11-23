@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Document;
+use App\Models\ProjectDocument;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,10 +74,10 @@ class SecurityAcceptanceTest extends TestCase
     /** AC-02 / R02: private document download requires organization authorization */
     public function test_ac02_member_cannot_download_another_organizations_document(): void
     {
-        $document = Document::where('project_id', $this->betaProject()->id)->firstOrFail();
+        $document = ProjectDocument::where('project_id', $this->betaProject()->id)->firstOrFail();
 
         $response = $this->actingAs($this->user('staff.alpha@example.test'))
-            ->get('/documents/'.$document->id.'/download');
+            ->get('/project-documents/'.$document->id.'/download');
 
         $this->assertDenied($response);
     }
@@ -93,7 +93,7 @@ class SecurityAcceptanceTest extends TestCase
 
         $response->assertSessionHasErrors('file');
         Storage::disk('local')->assertMissing('documents/'.$alphaProject->id.'/payload.php');
-        $this->assertDatabaseMissing('documents', ['original_name' => 'payload.php']);
+        $this->assertDatabaseMissing('project_documents', ['original_name' => 'payload.php']);
     }
 
     /** AC-03b / R03: oversized uploads are rejected */
@@ -148,7 +148,7 @@ class SecurityAcceptanceTest extends TestCase
     {
         $this->get('/projects')->assertRedirect('/login');
         $this->get('/projects/1')->assertRedirect('/login');
-        $this->get('/documents/1/download')->assertRedirect('/login');
+        $this->get('/project-documents/1/download')->assertRedirect('/login');
     }
 
     public function test_control_project_listing_is_tenant_filtered(): void
@@ -164,9 +164,9 @@ class SecurityAcceptanceTest extends TestCase
     {
         $beta = $this->betaProject();
 
-        $this->actingAs($this->user('admin.alpha@example.test'))
-            ->delete('/projects/'.$beta->id)
-            ->assertForbidden();
+        $this->assertDenied(
+            $this->actingAs($this->user('admin.alpha@example.test'))->delete('/projects/'.$beta->id)
+        );
 
         $this->assertDatabaseHas('projects', ['id' => $beta->id]);
     }

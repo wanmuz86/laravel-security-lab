@@ -7,7 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * Organization administration (routes protected by the org.admin middleware).
+ * REFERENCE SOLUTION (instructor): bonus finding - admins may only manage their own organization.
  */
 class TeamController extends Controller
 {
@@ -20,6 +20,8 @@ class TeamController extends Controller
 
     public function updateRole(Request $request, User $user): RedirectResponse
     {
+        abort_unless($user->organization_id === $request->user()->organization_id, 404);
+
         $data = $request->validate(['role' => ['required', 'in:admin,member']]);
 
         $user->update(['role' => $data['role']]);

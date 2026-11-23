@@ -2,12 +2,11 @@
 
 @section('content')
 <div class="card">
-    <h2>Search results</h2>
-    <p class="muted">Query: {{ $q }}</p>
+    <h2>Search results for: {{ $keyword }}</h2>
     <table>
         <thead><tr><th>ID</th><th>Name</th><th>Description</th></tr></thead>
         <tbody>
-        @forelse($results as $row)
+        @forelse($projects as $row)
             <tr>
                 <td>{{ $row->id }}</td>
                 <td><a href="{{ route('projects.show', $row->id) }}">{{ $row->name }}</a></td>
@@ -18,6 +17,7 @@
         @endforelse
         </tbody>
     </table>
+    {{ $projects->links('pagination::simple-default') }}
     <a href="{{ route('projects.index') }}">Back to projects</a>
 </div>
 @endsection
