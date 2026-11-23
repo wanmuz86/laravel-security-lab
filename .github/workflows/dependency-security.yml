@@ -1,0 +1,45 @@
+name: Dependency Security & Audit
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      - name: Run Composer Audit
+        run: composer audit --locked --no-interaction
+      
+      
+      - name: Build and start the application
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            curl --fail --silent http://localhost:8000/up && exit 0
+            sleep 3
+          done
+          docker compose logs app
+          exit 1
+          
+      - name: Execute Application Tests
+        run: docker compose exec -T app php artisan test

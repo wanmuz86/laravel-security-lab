@@ -2,12 +2,14 @@
 
 namespace Database\Seeders;
 
-use App\Models\Document;
+use App\Models\Order;
+use App\Models\ProjectDocument;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Deterministic training data. Project IDs are fixed so instructions can reference them:
@@ -60,6 +62,54 @@ class DatabaseSeeder extends Seeder
 
             $this->createDocument($project, $created[$creatorEmail], $org->name);
         }
+        $this->seedOrders($alpha, $beta, $password);
+
+        Project::where('name', 'Alpha Website Redesign')->firstOrFail()->comments()->create([
+            'user_id' => $created['staff.alpha@example.test']->id,
+            'content' => 'Project meeting scheduled for Monday.',
+        ]);
+    }
+
+    /**
+     * Lab 7: fictional customers Alice and Bob, their orders and fixed training API tokens.
+     * Orders are created with forceCreate() so the seeder keeps working after $fillable is restricted.
+     */
+    private function seedOrders(Organization $alpha, Organization $beta, string $password): void
+    {
+        $alice = User::create(['name' => 'Alice Customer', 'email' => 'alice@example.test', 'password' => $password, 'organization_id' => $alpha->id, 'role' => 'member']);
+        $bob = User::create(['name' => 'Bob Customer', 'email' => 'bob@example.test', 'password' => $password, 'organization_id' => $beta->id, 'role' => 'member']);
+
+        $orders = [
+            [$alice, 'ORD-001', 'Training order', 15000, 'PAY-PRIVATE-001', 'Internal finance review'],
+            [$bob, 'ORD-002', 'Bob training order', 25000, 'PAY-PRIVATE-002', 'BOB-PRIVATE-MARKER: internal finance notes'],
+            [$alice, 'ORD-003', 'Alice second order', 9900, 'PAY-PRIVATE-003', 'Alice repeat customer'],
+            [$bob, 'ORD-004', 'Bob second order', 4500, 'PAY-PRIVATE-004', 'Bob repeat customer'],
+            [$alice, 'ORD-005', 'Alice spare draft order', 3200, 'PAY-PRIVATE-005', 'Spare order for processing demos'],
+        ];
+
+        foreach ($orders as [$owner, $reference, $description, $total, $payment, $notes]) {
+            Order::forceCreate([
+                'user_id' => $owner->id,
+                'reference' => $reference,
+                'description' => $description,
+                'total_cents' => $total,
+                'status' => 'draft',
+                'payment_reference' => $payment,
+                'internal_notes' => $notes,
+            ]);
+        }
+
+        // Fixed, fictional training tokens so Postman can start immediately (Lab 7 Part A6).
+        foreach ([[$alice, 'lab7-alice-training-token-0001'], [$bob, 'lab7-bob-training-token-0002']] as [$owner, $plain]) {
+            PersonalAccessToken::forceCreate([
+                'tokenable_type' => User::class,
+                'tokenable_id' => $owner->id,
+                'name' => 'lab7-training',
+                'token' => hash('sha256', $plain),
+                'abilities' => ['*'],
+                'expires_at' => now()->addDays(30),
+            ]);
+        }
     }
 
     private function createDocument(Project $project, User $uploader, string $orgName): void
@@ -71,7 +121,7 @@ class DatabaseSeeder extends Seeder
 
         Storage::disk('local')->put($path, $contents);
 
-        Document::create([
+        ProjectDocument::create([
             'project_id' => $project->id,
             'original_name' => $filename,
             'path' => $path,

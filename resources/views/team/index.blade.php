@@ -13,7 +13,7 @@
                 <td>{{ $member->email }}</td>
                 <td>{{ $member->role }}</td>
                 <td>
-                    <form method="POST" action="{{ route('team.role', $member->id) }}" style="display:flex;gap:6px">
+                    <form method="POST" action="{{ route('team.role', $member->id) }}" class="row">
                         @csrf
                         @method('PATCH')
                         <select name="role">

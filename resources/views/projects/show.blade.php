@@ -7,8 +7,8 @@
     <p>{{ $project->description }}</p>
     <a class="btn" href="{{ route('projects.edit', $project->id) }}">Edit</a>
     @if(auth()->user()->isOrgAdmin())
-        <form method="POST" action="{{ route('projects.destroy', $project->id) }}" style="display:inline"
-              onsubmit="return confirm('Delete this project?')">
+        <form method="POST" action="{{ route('projects.destroy', $project->id) }}" class="inline"
+              data-confirm="Delete this project?">
             @csrf
             @method('DELETE')
             <button class="danger" type="submit">Delete</button>
@@ -26,7 +26,7 @@
                 <td>{{ $document->id }}</td>
                 <td>{{ $document->original_name }}</td>
                 <td>{{ $document->size }} bytes</td>
-                <td><a href="{{ route('documents.download', $document->id) }}">Download</a></td>
+                <td><a href="{{ route('projects.documents.download', [$project->id, $document->id]) }}">Download</a></td>
             </tr>
         @empty
             <tr><td colspan="4" class="muted">No documents.</td></tr>
@@ -35,10 +35,29 @@
     </table>
 
     <h4>Upload a document</h4>
-    <form method="POST" action="{{ route('documents.store', $project->id) }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ route('project-documents.store', $project->id) }}" enctype="multipart/form-data">
         @csrf
         <input type="file" name="file" required>
         <button class="primary" type="submit">Upload</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Comments</h3>
+    @forelse($project->comments as $comment)
+        <div class="comment">
+            <div class="muted">{{ $comment->user->name }} · {{ $comment->created_at }}</div>
+            {!! nl2br(e($comment->content)) !!}
+        </div>
+    @empty
+        <p class="muted">No comments yet.</p>
+    @endforelse
+
+    <h4>Add a comment</h4>
+    <form method="POST" action="{{ route('projects.comments.store', $project->id) }}">
+        @csrf
+        <textarea name="content" rows="3"></textarea>
+        <button class="primary" type="submit">Post comment</button>
     </form>
 </div>
 @endsection

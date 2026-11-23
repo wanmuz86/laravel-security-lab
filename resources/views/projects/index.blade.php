@@ -2,11 +2,11 @@
 
 @section('content')
 <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="row-between">
         <h2>Projects</h2>
         <a class="btn" href="{{ route('projects.create') }}">New project</a>
     </div>
-    <form method="GET" action="{{ route('projects.search') }}" style="display:flex;gap:8px">
+    <form method="GET" action="{{ route('projects.search') }}" class="row">
         <input type="text" name="q" placeholder="Search projects by name">
         <button class="primary" type="submit">Search</button>
     </form>

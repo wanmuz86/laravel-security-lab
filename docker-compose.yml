@@ -11,6 +11,29 @@ services:
       - ./resources/views:/var/www/html/resources/views
       - ./database/migrations:/var/www/html/database/migrations
       - ./database/seeders:/var/www/html/database/seeders
+      - ./database/factories:/var/www/html/database/factories
       - ./tests:/var/www/html/tests
+      # Lab 4: session/auth config, middleware registration, test config and environment (edit on the host)
+      - ./config/auth.php:/var/www/html/config/auth.php
+      - ./config/session.php:/var/www/html/config/session.php
+      - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
+      - ./phpunit.xml:/var/www/html/phpunit.xml
+      # Lab 5: filesystem disks, PHP upload limits and static assets (edit on the host)
+      - ./config/filesystems.php:/var/www/html/config/filesystems.php
+      - ./docker/php/lab5.ini:/usr/local/etc/php/conf.d/zz-lab5.ini
+      - ./public/css:/var/www/html/public/css
+      - ./public/js:/var/www/html/public/js
+      # Lab 6: integration settings (SSRF fetcher / webhooks) and the local "internal" test service
+      - ./config/integrations.php:/var/www/html/config/integrations.php
+      - ./ssrf-test-service:/var/www/html/ssrf-test-service
+      - ./docker/env.lab:/var/www/html/.env.lab
       - ./solutions:/var/www/html/solutions
+      # Lab 8: Composer files live in the repository (commit them; vendor/ stays in the container)
+      - ./composer.json:/var/www/html/composer.json
+      - ./composer.lock:/var/www/html/composer.lock
+      - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh
+      # Lab 8: audit / SBOM output written inside the container appears here on the host
+      - ./reports:/var/www/html/reports
+      - ./.github:/var/www/html/.github
+      - ./config/services.php:/var/www/html/config/services.php
     # Bound to localhost only: this application is intentionally vulnerable.

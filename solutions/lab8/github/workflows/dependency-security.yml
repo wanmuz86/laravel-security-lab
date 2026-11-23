@@ -1,0 +1,45 @@
+name: Dependency Security & Audit
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Least privilege: the workflow token can only read repository contents.
+permissions:
+  contents: read
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      # For production pipelines pin third-party actions to an immutable commit SHA
+      # (uses: owner/action@<40-char-sha>) and let Dependabot (github-actions ecosystem) keep them current.
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      # This repository keeps only composer.json / composer.lock (the Laravel skeleton and vendor/
+      # are built inside the Docker image), so audit the lock file directly. No `composer install` needed.
+      - name: Run Composer Audit
+        run: composer audit --locked --no-interaction
+
+      # The application itself runs in Docker (see Dockerfile), so the tests run there too.
+      - name: Build and start the application
+        run: |
+          docker compose up -d --build
+          curl --fail --silent --retry 40 --retry-delay 3 --retry-connrefused http://localhost:8000/up
+
+      - name: Execute Application Tests
+        run: docker compose exec -T app php artisan test

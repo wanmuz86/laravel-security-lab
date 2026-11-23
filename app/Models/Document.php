@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,10 +9,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Document extends Model
 {
-    protected $fillable = ['project_id', 'original_name', 'path', 'mime_type', 'size', 'uploaded_by'];
+    protected $fillable = [
+        'user_id',
+        'original_name',
+        'storage_path',
+        'mime_type',
+        'size',
+        'sha256',
+        'status',
+        'scanned_at',
+    ];
 
-    public function project(): BelongsTo
+    protected function casts(): array
     {
-        return $this->belongsTo(Project::class);
+        return [
+            'scanned_at' => 'datetime',
+        ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }
