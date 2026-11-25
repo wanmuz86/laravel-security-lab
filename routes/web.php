@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Auth\LoginController;
@@ -28,6 +29,18 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+
+  Route::get('/documents/{document}/download', [
+        DocumentController::class, 'download',
+    ])->name('documents.download');
+
+   
+    Route::post('/documents', [
+        DocumentController::class, 'store',
+    ])->name('documents.store');
+
+    Route::view('/upload-test', 'upload-test');
+
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
     Route::get('/dashboard', fn () => redirect()->route('projects.index'))->name('dashboard');
 

@@ -10,6 +10,13 @@ use Illuminate\Http\Request;
  */
 class InsecureUploadController extends Controller
 {
+
+/* 1) No validation - file type and file size
+    2) Originial filename should be renamed
+    3)  Automatically upload in public folder
+    4) No quarantine and malware scan
+    5) No ownership record - Who can see what
+*/
     public function store(Request $request)
     {
         $file = $request->file('document');

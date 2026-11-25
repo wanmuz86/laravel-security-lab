@@ -40,6 +40,13 @@ return [
             'report' => false,
         ],
 
+        # Private storage setup
+        'secure_documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/secure-documents'),
+            'visibility' => 'private',  #visibility => private
+            'throw' => true,
+            ],
     ],
 
     'links' => [
