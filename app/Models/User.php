@@ -10,6 +10,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    // HasApiTokens -  WHen user log in, it will be assigned to a token
+    // HasFactory - Related to Factory
+    // Notifiable - related to publish subscribve -> Lravel notification
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = ['name', 'email', 'password', 'organization_id', 'role'];

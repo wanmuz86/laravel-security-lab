@@ -26,9 +26,18 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        /// Session needs to be regenarate
+        // Call 
+        //  $request->session()->regenerate()
+        // $request->session()->invalidate()
+
         if (! Auth::attempt($credentials)) {
             return back()->withErrors(['email' => 'Invalid credentials.'])->onlyInput('email');
         }
+
+
+        // $request->session()->invalidate();
+        $request->session()->regenerate(); // this replace the session 
 
         return redirect()->intended(route('projects.index'));
     }
@@ -36,6 +45,11 @@ class AuthController extends Controller
     public function logout(Request $request): RedirectResponse
     {
         Auth::logout();
+        /// Session needs to be regenarate
+        // Call 
+         $request->session()->regenerateToken(); // This replace csrf token
+        $request->session()->invalidate();
+
 
         return redirect()->route('login');
     }

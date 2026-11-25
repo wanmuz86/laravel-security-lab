@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DocumentController;
@@ -11,8 +13,22 @@ use Illuminate\Support\Facades\Route;
 Route::redirect('/', '/projects');
 
 Route::middleware('guest')->group(function () {
+
+    Route::post('/forgot-password', [
+        PasswordResetController::class, 'requestReset',
+    ]);
+
+    Route::post('/reset-password', [
+        PasswordResetController::class, 'reset',
+    ])->name('password.update');
+
+
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
+    // Route::post('/login', [AuthController::class, 'login']);
+     Route::post('/login', [
+        LoginController::class, 'store',
+    ])->name('login');
+
 
     // Lab 4: pages linked from the password-reset notification (the POST handlers are built in Part D).
     Route::get('/forgot-password', fn () => view('auth.forgot-password'))->name('password.request');
@@ -23,7 +39,11 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    // Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('/logout', [
+        LoginController::class, 'destroy',
+    ])->name('logout');
+
     Route::get('/dashboard', fn () => redirect()->route('projects.index'))->name('dashboard');
 
     // Projects
